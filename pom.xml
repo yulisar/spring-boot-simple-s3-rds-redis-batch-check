@@ -8,7 +8,7 @@
 		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.example</groupId>
-	<artifactId>spring-boot-simple</artifactId>
+	<artifactId>spring-boot-simple-s3-rds-redis-check</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>spring-boot-simple</name>
 	<description>Simple project for Spring Boot</description>

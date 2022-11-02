@@ -19,14 +19,15 @@ public class UserRedisService {
 	private UserRedisRepo userRedisRepo;
 
 	public void addSomeUsers() {
-		log.info("======Saving some data to Redis===============================");
+		log.info("======Saving some data to Redis===========================");
+		log.info("Using hardcoded data====================");
 		userRedisRepo.save(new UserRedis(55L, "UserName25", "EmaildId25"));
 		userRedisRepo.save(new UserRedis(56L, "UserName26", "EmaildId26"));
 		userRedisRepo.save(new UserRedis(57L, "UserName27", "EmaildId27"));
 	}
 
 	public String getAllUsers() {
-		log.info("======Get some data from Redis===============================");
+		log.info("======Get some data from Redis============================");
 		List<UserRedis> lUserRedis = (List<UserRedis>) userRedisRepo.findAll();
 		for (UserRedis userRedis : lUserRedis) {
 			log.info("User Redis List:");

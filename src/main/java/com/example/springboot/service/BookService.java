@@ -31,8 +31,8 @@ public class BookService {
 	}
 	
 	public String getAllBook() {
+		log.info("Get All Book: ");
 		List<Book> lbook = (List<Book>) bookRepo.findAll();
-		
 		for (Book book : lbook) {
 			log.info(book.getName());
 		}
