@@ -1,6 +1,10 @@
-FROM amazoncorretto:11.0.17-alpine
+FROM adoptopenjdk/openjdk11:jdk-11.0.7_10-alpine-slim
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 ARG JAR_FILE=target/*.jar
 COPY ${JAR_FILE} app.jar
 ENTRYPOINT ["java","-jar","/app.jar"]
+
+
+amazoncorretto/11.0.17-alpine
+FROM amazoncorretto:11.0.17-alpine
