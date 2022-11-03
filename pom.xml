@@ -8,9 +8,9 @@
 		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.example</groupId>
-	<artifactId>spring-boot-simple-s3-rds-redis-check</artifactId>
+	<artifactId>spring-boot-simple-s3-rds-redis-batch-check</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>spring-boot-simple</name>
+	<name>spring-boot-simple--s3-rds-redis-batch-check</name>
 	<description>Simple project for Spring Boot</description>
 
 	<properties>
@@ -51,6 +51,11 @@
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
 
+		<dependency>
+			<groupId>com.amazonaws</groupId>
+			<artifactId>aws-java-sdk-batch</artifactId>
+			<version>1.11.470</version>
+		</dependency>
 
 		<dependency>
 			<groupId>com.amazonaws</groupId>
@@ -94,8 +99,8 @@
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
 		</dependency>
-		
-				<dependency>
+
+		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>aws-springboot-simple-s3-rds-access</name>
+	<name>aws-springboot-simple-s3-rds-batch-access</name>
 	<comment></comment>
 	<projects>
 	</projects>
