@@ -1,0 +1,125 @@
+image: maven:3-adoptopenjdk-11
+
+stages:
+- build
+- package
+- release
+- deploy
+
+cache:
+    paths:
+    - .maven/
+
+variables:
+    APP_NAME: cms
+    REPOSITORY_URL: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/my.infuture.paymenthub/${APP_NAME}/sit
+
+before_script:
+- chmod +x mvnw
+- export MAVEN_USER_HOME=`pwd`/.maven
+
+### Compile spring-boot app
+maven-compile:
+    stage: build
+    only:
+    - cicdtest
+    tags:
+    #run on specific runner  ## NOTE1
+     - ocbcsgRunnerA  
+    script:
+    - ./mvnw compile -Dmaven.repo.local=$MAVEN_USER_HOME --settings .gitlab-deploy/settings.xml
+    artifacts:
+        paths:
+        - target/classes/
+        - target/generated-sources/
+        expire_in: 1 hrs
+
+
+### Package spring-boot app
+maven-package:
+    stage: package
+    only:
+    - cicdtest 
+    tags:
+    - ocbcsgRunnerA
+    script:
+    - ./mvnw verify -DskipTests -Dmaven.repo.local=$MAVEN_USER_HOME --settings .gitlab-deploy/settings.xml
+    - echo "Make dependency dir.."
+    - mkdir -p target/dependency && (cd target/dependency; jar -xf ../${APP_NAME}-*.jar)
+    artifacts:
+        paths:
+        - target/${APP_NAME}-*.jar
+        - target/dependency
+        expire_in: 1 hrs
+
+### Push docker image to ECR
+docker-push:
+    stage: release
+    image:
+        name: amazon/aws-cli:2.1.10
+        entrypoint: [ "" ]
+    dependencies:
+    - maven-package
+    only:
+    - cicdtest
+    tags:
+    #run on specific runner
+    - ocbcsgRunnerA
+    variables:
+        ## When using dind, it's wise to use the overlays driver for improved performance.
+        DOCKER_DRIVER: overlay2
+        DOCKER_TLS_CERTDIR: ""
+    services:
+    - docker:19.03.12-dind
+    before_script:
+    ## Install docker
+    - amazon-linux-extras install docker
+    ## Login to AWS ECR
+    - echo "Login to AWS ECR..."
+    - aws --region ${AWS_REGION} ecr get-login-password | docker login --password-stdin --username AWS "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+    ## Image tag name to be push to ECR
+    #- IMAGE_TAG="$(echo $CI_COMMIT_BRANCH)-$(echo $CI_COMMIT_SHA | head -c 8)" # image tag = [branch_name]-[commit_SHA]
+    #- apt-get update && apt-get install -qy xmlstarlet libxml2-utils # this is needed to get pom version from xmllint
+    #- POM_VERSION=$(xmllint --xpath "//*[local-name()='project']/*[local-name()='version']/text()" pom.xml)
+    #- IMAGE_TAG=$(echo $CI_COMMIT_BRANCH)-${POM_VERSION} # image tag = [branch_name]-[pom_version]
+    - IMAGE_TAG="$(grep -m1 '<version>' pom.xml | grep -oP '(?<=>).*(?=<)')" # image tag = [pom_version]
+    script:
+    - echo "[Temporary] - Remove existing image... - $IMAGE_TAG"
+    - aws ecr batch-delete-image --repository-name my.infuture.paymenthub\/${APP_NAME}/sit --image-ids imageTag=$IMAGE_TAG
+    - echo "Building image..."
+    - docker build  --tag $REPOSITORY_URL:$IMAGE_TAG .
+    - echo "Pushing image..."
+    - docker push $REPOSITORY_URL:$IMAGE_TAG
+    - echo "Remove image from gitlab runner..."
+    - docker rmi $(docker images -q $REPOSITORY_URL) -f
+
+### Deploy to ECS
+deploy-ecs:
+    stage: deploy
+    image:
+        name: amazon/aws-cli:2.1.10
+        entrypoint: [ "" ]
+    only:
+    - cicdtest
+    tags:
+    #run on specific runner
+    - ocbcsgRunnerA
+    variables:
+        TASK_DEFINITION: "phsit-cms-td"
+        SERVICE: "phsit-cms-service"
+        CLUSTER: "phsit-cms-cluster"
+        COUNT: 2
+    before_script:
+        ## Image tag name to be pull from ECR
+        #- IMAGE_TAG="$(echo $CI_COMMIT_BRANCH)-$(echo $CI_COMMIT_SHA | head -c 8)" # image tag = [branch_name]-[commit_SHA]
+        #- apt-get update && apt-get install -qy xmlstarlet libxml2-utils # this is needed to get pom version
+        #- POM_VERSION=$(xmllint --xpath "//*[local-name()='project']/*[local-name()='version']/text()" pom.xml)
+        #- IMAGE_TAG=$(echo $CI_COMMIT_BRANCH)-${POM_VERSION} # image tag = [branch_name]-[pom_version]
+        - IMAGE_TAG="$(grep -m1 '<version>' pom.xml | grep -oP '(?<=>).*(?=<)')" # image tag = [pom_version]
+    script:
+        ## Replace image in task definition json file
+        - sed -i -e "s/{{ECR_IMAGE}}/${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com\/my.infuture.paymenthub\/${APP_NAME}\/sit:${IMAGE_TAG}/g" .gitlab-deploy/phsitcms-taskdef.json
+        - echo "Create task definition..."
+        - aws ecs register-task-definition --region ${AWS_REGION} --family ${TASK_DEFINITION} --cli-input-json file://.gitlab-deploy/phsitcms-taskdef.json
+        - echo "Update ecs service..."
+        - aws ecs update-service --region ${AWS_REGION} --cluster ${CLUSTER} --service ${SERVICE} --task-definition ${TASK_DEFINITION} --desired-count ${COUNT}
